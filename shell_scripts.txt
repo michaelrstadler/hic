@@ -1,0 +1,14 @@
+#changing filename: adding 1 to the number between some _'s in a file
+
+for j in $i; do echo $j | awk '{split($0,a,"_"); a[3]=a[3]+1;b=a[1]"_"a[2]"_"a[3]"_"a[4]; system("mv "$0" "b)}';done
+
+#sorting BED file for dm3->dm6 conversion
+
+for j in $i;do k=`echo $j | sed s/.txt//`; head -n 1 $j >${k}_clean.txt; tail -n +2 $j | sort -k1,1 -k2,2n >>${k}_clean.txt;done
+
+#mapping with files in temp folder, from root, with unzipping and removal
+gzip -dc temp/${i}.fastq.gz >temp/${i}.fastq && python scripts/Iterative_mapping_bowtie_v1.4.py -i 20 -l 100 -g bowtie_indexes/dmel_6_22_dvir_20181019_combined -p 10 -f temp/${i}.fastq -o temp/${i} && rm temp/${i}.fastq &
+
+#Making viewer files
+
+for f in 57 58 59;do for c in X 2L 2R 3L 3R 4; do for b in 500 1000 2000 4000; do python ../../../scripts/HiC_generate_local_maps_from_compressed_wholeGenome.py -f HiC-${f}_CompressedBinCounts_1000bp_${c}_VCnorm.txt -b $b -w 400 -s 200 -o HiC-${f};done; done; done &
