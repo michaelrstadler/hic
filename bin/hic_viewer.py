@@ -9,7 +9,7 @@ from ipywidgets import GridspecLayout
 from IPython.display import display, clear_output
 import re
 
-def viewer(data_folder, track_folder, save_folder):
+def viewer(data_folder, track_folder, save_folder, oldformat=True, genometracks=True):
     """Jupyter notebook viewer for Hi-C data
     
     Args:
@@ -19,6 +19,10 @@ def viewer(data_folder, track_folder, save_folder):
             Folder containing genomic track data
         save_folder: string or file object
             Folder to save images to.
+        oldformat: bool
+        	If true, expects viewer files with column and row names.
+        genometracks: bool
+        	If true, displays genomic tracks from track_folder.
             
     Returns: None
         
@@ -49,6 +53,8 @@ def viewer(data_folder, track_folder, save_folder):
         values."""
         chr_maxes = {}
         for filename in os.listdir(data_folder):
+            if (filename[0] == '.'):
+            	continue
             chr_, pos1, pos2, binsizetxt = filename.split('_')
             max_ = int(pos1)
             if (chr_ not in chr_maxes):
@@ -68,7 +74,10 @@ def viewer(data_folder, track_folder, save_folder):
         """Load viewer file of a Hi-C matrix, replace 0s and NaNs with dummy values, 
         trim outliers, take log."""
         # Load data, remove row names in first column.
-        x = np.genfromtxt(infilename, delimiter='\t', skip_header=1)[:,1:]
+        if (oldformat):
+        	x = np.genfromtxt(infilename, delimiter='\t', skip_header=1)[:,1:]
+        else:
+        	x = np.genfromtxt(infilename)
         # Resolve 0s and NaNs by setting to dummy value 0.1.
         dummy_val = 0.1
         x[x == 0] = dummy_val
@@ -128,22 +137,24 @@ def viewer(data_folder, track_folder, save_folder):
             ax[0].set_xticks(minorticks, minor=True)
             ax[0].set_yticks(minorticks, minor=True)
 
-            # Draw genomic track portion of figure.
-            track_binsize = 500
-            track_binL = int(state.posL / track_binsize)
-            track_binR = int(state.posR / track_binsize)
-            ax[1].cla()
-            ax[1].plot(state.track_data[state.chr][np.arange(track_binR, track_binL, -1)], np.arange(track_binL, track_binR))
-            ax[1].set_ylim(track_binL, track_binR)
-            ax[1].set_yticklabels([])
-            ax[1].set_xticklabels([])
-            ax[1].set_xticks([])
-            ax[1].set_yticks([])
+            if genometracks:
+	            # Draw genomic track portion of figure.
+	            track_binsize = 500
+	            track_binL = int(state.posL / track_binsize)
+	            track_binR = int(state.posR / track_binsize)
+	            ax[1].cla()
+	            ax[1].plot(state.track_data[state.chr][np.arange(track_binR, track_binL, -1)], np.arange(track_binL, track_binR))
+	            ax[1].set_ylim(track_binL, track_binR)
+	            ax[1].set_yticklabels([])
+	            ax[1].set_xticklabels([])
+	            ax[1].set_xticks([])
+	            ax[1].set_yticks([])
             
             # Execute changes on screen.
             fig.canvas.draw_idle()
             
         else:
+            print(file)
             ax[0].set_title('Position is out of bounds!', fontsize=14)
 
     ############################################################################
@@ -337,7 +348,6 @@ def viewer(data_folder, track_folder, save_folder):
     res_dropdown = make_resolution_dropdown()
     pos_slider = make_pos_slider()
     grid_toggle = make_grid_toggle()
-    track_dropdown = make_track_dropdown(track_folder)
     save_button = make_save_button()
     
     # Use GridspecLayout to lay out widgets.
@@ -346,15 +356,23 @@ def viewer(data_folder, track_folder, save_folder):
     grid[0,1] = res_dropdown
     grid[0,2] = cmap_dropdown
     grid[1,:2] = pos_slider
-    grid[1,2] = track_dropdown
     grid[2,:2] = contrast_slider
     grid[2,2] = grid_toggle
     grid[3,2] = save_button
+
+    if genometracks:
+    	track_dropdown = make_track_dropdown(track_folder)
+    	grid[1,2] = track_dropdown
+
     display(grid)    
     
     # Draw the initial figure.
     chosen_value=5
-    fig, ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [15, 1]}, figsize=(chosen_value, 1.05 * chosen_value / 2))
-    fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=-0.4, hspace=None)
+    if (genometracks):
+    	fig, ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [15, 1]}, figsize=(chosen_value, 1.05 * chosen_value / 2))
+    	fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=-0.4, hspace=None)
+    else:
+    	fig, ax = plt.subplots()
+    	ax = [ax]
     img = ax[0].imshow(np.zeros((400,400)), vmin=0, vmax=1000, cmap=state.cmap, interpolation="none")
     update_position()

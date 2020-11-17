@@ -107,7 +107,7 @@ for bins_combine in bin_combinations:
 				counts_bin1_bin2 = get_bin_bin_counts(bin1, bin2, bins_combine, bin_bin_counts)
 				if (total_counts_bin1 != 0 and total_counts_bin2 != 0):
 					count_norm = float(counts_bin1_bin2) / total_counts_bin1 / total_counts_bin2 * arb_constant
-					outfile.write(str(count_norm) + '\n')
+					outfile.write(str(round(count_norm, 2)) + '\n')
 				else:
 					outfile.write('NA\n')
 
