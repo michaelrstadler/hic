@@ -4,6 +4,7 @@ Describe program here.
 from optparse import OptionParser
 import sys
 import re
+import gzip
 
 def parse_options():
 	parser = OptionParser()
@@ -31,7 +32,11 @@ chr_lists = {
 }
 good_chromosomes = chr_lists[species]
 
-file = open(options.filename, 'r')
+f = options.filename
+if (f[-2:] == 'gz'):
+	file = gzip.open(f, 'rt')
+else:
+	file = open(f, 'r')
 
 for line in file:
 	line = line.rstrip()
