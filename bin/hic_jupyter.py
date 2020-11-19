@@ -733,7 +733,7 @@ def downsample_match_compressed_bin(small_filename, big_filename, outfilename, w
     outfile.close()
 
 ############################################################################
-def insulation_cum_dist(agg_orig, buffer=2, min_dist=3, max_dist=100):
+def insulation_cum_dist(agg_orig, buffer=2, min_dist=3, max_dist=100, binsize=500):
     """Calculate an insulation score as a function of distance from an aggregate 
     Hi-C matrix
     
@@ -747,7 +747,21 @@ def insulation_cum_dist(agg_orig, buffer=2, min_dist=3, max_dist=100):
     distance from the diagonal, and compare the mean signal of the pixels in the "across"
     region to the "not across" region.
     
-    
+    Args:
+    	agg_orig: numpy ndarray
+			Aggregate Hi-C matrix
+		buffer: int
+			Number of bins on either side of the boundary (feature) to omit in calculation
+		min_dist: int
+			Starting distance from diagonal to compute
+		max_dist: int
+			Ending distance from diagonal to compute
+
+	Returns:
+		scores: list
+			Insulation scores by distance
+		distances: list
+			Matching genomic distances
     """
     agg = agg_orig.copy()
     # Reset minimum value to 0 to avoid negative number problems.
@@ -775,4 +789,208 @@ def insulation_cum_dist(agg_orig, buffer=2, min_dist=3, max_dist=100):
         non_insulated = agg[non_insulated_indexes]
         # Is division the right thing here?
         scores.append(non_insulated.mean() / insulated.mean())
-    return scores
+    distances = np.arange(min_dist, max_dist) * binsize
+    return scores, distances
+
+############################################################################
+def features_assign_chip_scores(feature_file, signal_files, outfolder, 
+            outputname, names, norm=True, width=2, feature_file_cols=[0,1], 
+            signal_file_cols=[0,1,3], max_chr_size = 5e7, binsize=500):
+    """Assign relative scores to genomic features from ChIP-like input data
+    
+    The concept is that boundaries are sites of combinatoric insulator protein
+    binding, but that different different boundaries have distinct combinations
+    of protein binding, with individual proteins more "dominant" at some
+    boundaries than others. To this end, input ChIP signals are first normalized,
+    then each boundary (or other feature) is assigned a score for each protein
+    as a fraction of the total ChIP signal at that boundary. So, protein X
+    will have a high score at a boundary where its signal is high but there is 
+    little signal for the other proteins in the set. The output is a gff-like 
+    file for each protein with the fractional score in the score column. This 
+    file can be used as input to other scripts and functions.
+    
+    Args:
+        feature_file:
+            File containing genomic features (boundaries)
+        signal_files: list-like
+            Files containing ChIP-like data (genome-wide, continuous)
+        outfolder: string
+            Path to folder to write outfile
+        
+        
+        outputname: string
+            Name for output files to which names entry is appended.
+        names: list-like, iterable
+            Names corresponding to the signal files to be used in output files
+        norm: bool
+            If true, reports ChIP signal as a fraction of total ChIP signal. 
+            Otherwise, just reports the ChIP signal itself.
+        width: int
+            Width, in bins, of the region used to calculate the signal at each 
+            feature
+        feature_file_cols: list
+            Columns in the feature file corresponding to [chromosome, position]
+        signal_file_cols: list
+            Columns in the signal files corresponding to [chromosome, position
+            score/value]
+        max_chr_size: int
+            Max size of chromosomes, in base pairs (used for memory allocation)
+        binsize: int
+            Size, in base pairs, of bins in signal files
+        
+        
+    """
+    # Read in data from signal files.
+    max_chr_bin = int(max_chr_size / binsize)
+    # Store signal in dict of ndarray, keys are chromosomes, dim1 is signal ID (
+    # one per signal file) dim2 is genomic position.
+    signal = {}
+    for i in range(0, len(signal_files)):
+        signal_file = signal_files[i]
+        with open(signal_file, 'r') as f:
+            for line in f:
+                chr_, loc, val = np.array(line.rstrip().split())[signal_file_cols]
+                chr_ = re.sub('chr', '', chr_)
+                if (chr_ not in signal):
+                    signal[chr_] = np.ndarray((max_chr_bin, len(signal_files)))
+                bin_ = int(int(loc) / binsize)
+                signal[chr_][bin_, i] = val
+    
+    # Normalize signals.
+    for chr_ in signal.keys():
+        sums = np.sum(signal[chr_], axis=0)
+        sums_mean = np.mean(sums)
+        signal[chr_] = signal[chr_] / sums * sums_mean
+    
+    # Read features into dict of list, keys are chromosomes, list entries are
+    # genomic positions.
+    features = {}
+    with open(feature_file, 'r') as f:
+        for line in f:
+            items = np.array(line.rstrip().split())
+            chr_, loc = items[feature_file_cols]
+            chr_ = re.sub('chr', '', chr_)
+            bin_ = int(int(loc) / binsize)
+            if (chr_ not in features):
+                features[chr_] = []
+            features[chr_].append(bin_)
+    
+    # Write out file for each input signal.
+    for i in range(0, len(signal_files)):
+        outfile = os.path.join(outfolder, outputname + names[i] + '.txt')
+        with open(outfile, 'w') as out:
+            for chr_ in features:
+                for bin_ in features[chr_]:
+                    # Take the mean value for each signal in the window defined by width.
+                    means = np.mean(signal[chr_][(bin_-width):(bin_+width+1)], axis=0)
+                    # For each signal, value is either the mean signal or its fraction 
+                    # of the total signal.
+                    if (norm):
+                        value = means[i] / np.sum(means)
+                    else:
+                        value = means[i]
+                    pos = str(bin_ * binsize)
+                    out.write(chr_ + '\t.\t.\t' + pos + '\t' + pos + '\t' + str(value) + '\t.\t.\t.\n')
+                    
+############################################################################
+def plot_aggregate_features(panels, gff, rad=99, binsize=500):
+    """Plot aggregate Hi-C signal and insulation score for a genomic feature set
+    
+    Plots the aggregate (sum/mean) Hi-C score around a set of features supplied
+    in a gff file, and uses the score feature of the gff to split the features
+    into thirds and plots the same for these splits. The top row is for the
+    entire set, row 2-4 are for thirds with successively higher scores.
+    
+    Args:
+        panels: dict of dict of ndarray
+            Hi-C data panels. Keys are chromosome, then bin1 (left-most), value
+            is 2d numpy ndarray with hi-c data.
+        gff: pandas DF
+            gff object produced by load_gff. Each row is gff entry, col 0: 
+            chromosome, 1: mean position, 2: score
+        rad: int
+            The 'radius' of the window for the aggregate score. Length of
+            matrix will be 2*rad + 1.
+        binsize: int
+            The bin size, in bp, of the data to use (500, 1000, 2000, 4000)
+    
+    Returns: None
+    """
+    t1, t2 = np.percentile(list(gff.iloc[:,2]), (33, 66))
+    gff_1 = gff[gff.iloc[:,2] <= t1]
+    gff_2 = gff[(gff.iloc[:,2] > t1) & (gff.iloc[:,2] < t2)]
+    gff_3 = gff[gff.iloc[:,2] >= t2]
+    signal_norm_all = aggregate_signal_gff_landmarks_norm(panels, gff, rad, binsize)
+    signal_norm_1 = aggregate_signal_gff_landmarks_norm(panels, gff_1, rad, binsize)
+    signal_norm_2 = aggregate_signal_gff_landmarks_norm(panels, gff_2, rad, binsize)
+    signal_norm_3 = aggregate_signal_gff_landmarks_norm(panels, gff_3, rad, binsize)
+    
+    fig, ax = plt.subplots(4,2, figsize=(15,15))
+    ax[0][0].imshow(signal_norm_all)
+    ax[1][0].imshow(signal_norm_1)
+    ax[2][0].imshow(signal_norm_2)
+    ax[3][0].imshow(signal_norm_3)
+    ax[0][1].plot(insulation_score(signal_norm_all))
+    ax[1][1].plot(insulation_score(signal_norm_1))
+    ax[2][1].plot(insulation_score(signal_norm_2))
+    ax[3][1].plot(insulation_score(signal_norm_3))
+
+############################################################################
+def plot_aggregate_features_compare(panels1, panels2, gff, rad=99, binsize=500):
+    """Plot aggregate Hi-C signal and insulation score for a genomic feature set
+    in two Hi-C datasets
+    
+    Plots the aggregate (sum/mean) Hi-C score around a set of features supplied
+    in a gff file as well as the insulation-distance plot for the aggregate data.
+    Uses the score feature of the gff to split the features into thirds and plots 
+    the same for these splits. The top row is for the entire set, row 2-4 are for 
+    thirds with successively higher scores. Aggregate plots for panels1 is plotted 
+    in col 0, panels2 in col 1, and insulation-distance plots are overlaid in 
+    col 2. Data for panels1 is in blue, for panels2 in orange.
+    
+    Args:
+        panels1, panels2: dict of dict of ndarray
+            Hi-C data panels. Keys are chromosome, then bin1 (left-most), value
+            is 2d numpy ndarray with hi-c data.
+        gff: pandas DF
+            gff object produced by load_gff. Each row is gff entry, col 0: 
+            chromosome, 1: mean position, 2: score
+        rad: int
+            The 'radius' of the window for the aggregate score. Length of
+            matrix will be 2*rad + 1.
+        binsize: int
+            The bin size, in bp, of the data to use (500, 1000, 2000, 4000)
+    
+    Returns: None
+    """
+    t1, t2 = np.percentile(list(gff.iloc[:,2]), (33,66))
+    gff_1 = gff[gff.iloc[:,2] <= t1]
+    gff_2 = gff[(gff.iloc[:,2] > t1) & (gff.iloc[:,2] < t2)]
+    gff_3 = gff[gff.iloc[:,2] >= t2]
+
+    sig1_norm_all = aggregate_signal_gff_landmarks_norm(panels1, gff, rad, binsize)
+    sig1_norm_1 = aggregate_signal_gff_landmarks_norm(panels1, gff_1, rad, binsize)
+    sig1_norm_2 = aggregate_signal_gff_landmarks_norm(panels1, gff_2, rad, binsize)
+    sig1_norm_3 = aggregate_signal_gff_landmarks_norm(panels1, gff_3, rad, binsize)
+    sig2_norm_all = aggregate_signal_gff_landmarks_norm(panels2, gff, rad, binsize)
+    sig2_norm_1 = aggregate_signal_gff_landmarks_norm(panels2, gff_1, rad, binsize)
+    sig2_norm_2 = aggregate_signal_gff_landmarks_norm(panels2, gff_2, rad, binsize)
+    sig2_norm_3 = aggregate_signal_gff_landmarks_norm(panels2, gff_3, rad, binsize)
+    
+    fig, ax = plt.subplots(4,3, figsize=(15,15))
+    ax[0][0].imshow(sig1_norm_all)
+    ax[1][0].imshow(sig1_norm_1)
+    ax[2][0].imshow(sig1_norm_2)
+    ax[3][0].imshow(sig1_norm_3)
+    ax[0][1].imshow(sig2_norm_all)
+    ax[1][1].imshow(sig2_norm_1)
+    ax[2][1].imshow(sig2_norm_2)
+    ax[3][1].imshow(sig2_norm_3)
+    ax[0][2].plot(insulation_score(sig1_norm_all))
+    ax[0][2].plot(insulation_score(sig2_norm_all))
+    ax[1][2].plot(insulation_score(sig1_norm_1))
+    ax[1][2].plot(insulation_score(sig2_norm_1))
+    ax[2][2].plot(insulation_score(sig1_norm_2))
+    ax[2][2].plot(insulation_score(sig2_norm_2))
+    ax[3][2].plot(insulation_score(sig1_norm_3))
+    ax[3][2].plot(insulation_score(sig2_norm_3))

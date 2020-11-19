@@ -8,7 +8,7 @@ Make viewer-ready panels of Hi-C matrixes from a compressed bin count file.
 """
 
 __author__      = "Michael Stadler"
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 from optparse import OptionParser
 import sys
@@ -80,8 +80,13 @@ for line in file1:
 	# Add #-marked lines to total bin counts.
 	if (line[0] == '#'):
 		line = line[1:]
-		(chr, bin, count) = line.split('\t')
-		total_counts[int(bin)] = int(float(count)) #int of '0.0' throws error...have to go through float for some reason
+		(chr, bin_, count) = line.split('\t')
+		bin_ = int(bin_)
+		# Very rarely you can have a bin show up in the # total counts lines that doesn't show up in the bin-bin linkages.
+		# This occurs when the only contacts with this bin occur at a greater distance than the width. Because the size
+		# of total counts is determined from the largest bin in bin-bin counts, this creates an error.
+		if (bin_ < len(total_counts)):
+			total_counts[int(bin_)] = int(float(count)) #int of '0.0' throws error...have to go through float for some reason
 	# Add non-# lines to bin-bin counts.
 	else:
 		(chr, bin1, bin2, count) = line.split('\t')
