@@ -8,6 +8,7 @@ from ipywidgets import interact, IntSlider, Dropdown, IntRangeSlider, fixed, Rad
 from ipywidgets import GridspecLayout
 from IPython.display import display, clear_output
 import re
+import pandas as pd
 
 def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks=True):
     """Jupyter notebook viewer for Hi-C data
@@ -105,7 +106,8 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
                         max_bin = int(state.chr_maxes[chr_] / track_binsize)
                         track_data[chr_] = np.zeros(max_bin + 1000)
                     track_bin = int(int(posL) / track_binsize)
-                    track_data[chr_][track_bin] = float(val)
+                    if (track_bin < len(track_data[chr_])):
+                        track_data[chr_][track_bin] = float(val)
         return track_data
     
     def get_track_files(track_folder):
@@ -350,7 +352,7 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
     save_button = make_save_button()
     
     # Use GridspecLayout to lay out widgets.
-    grid = GridspecLayout(4, 3, height='130px', grid_gap="0px", align_items="center")
+    grid = GridspecLayout(4, 4, height='130px', grid_gap="0px", align_items="center")
     grid[0,0] = chr_dropdown
     grid[0,1] = res_dropdown
     grid[0,2] = cmap_dropdown
@@ -573,7 +575,7 @@ def aggregate_signal_gff_landmarks(panels, gff, rad=20, binsize=500):
 
 
 ############################################################################
-def aggregate_signal_gff_landmarks_norm(panels, gff, rad=20, binsize=500):
+def aggregate_signal_gff_landmarks_norm(panels, gff, rad=99, binsize=500):
     """aggregate_signal_gff_landmarks with normalization
     
     Wrapper for aggregate_signal_gff_landmarks. Generates a "randomized"
@@ -816,8 +818,6 @@ def features_assign_chip_scores(feature_file, signal_files, outfolder,
             Files containing ChIP-like data (genome-wide, continuous)
         outfolder: string
             Path to folder to write outfile
-        
-        
         outputname: string
             Name for output files to which names entry is appended.
         names: list-like, iterable
@@ -850,9 +850,10 @@ def features_assign_chip_scores(feature_file, signal_files, outfolder,
         with open(signal_file, 'r') as f:
             for line in f:
                 chr_, loc, val = np.array(line.rstrip().split())[signal_file_cols]
+                val = float(val)
                 chr_ = re.sub('chr', '', chr_)
                 if (chr_ not in signal):
-                    signal[chr_] = np.ndarray((max_chr_bin, len(signal_files)))
+                    signal[chr_] = np.zeros((max_chr_bin, len(signal_files)))
                 bin_ = int(int(loc) / binsize)
                 signal[chr_][bin_, i] = val
     
@@ -860,6 +861,7 @@ def features_assign_chip_scores(feature_file, signal_files, outfolder,
     for chr_ in signal.keys():
         sums = np.sum(signal[chr_], axis=0)
         sums_mean = np.mean(sums)
+
         signal[chr_] = signal[chr_] / sums * sums_mean
     
     # Read features into dict of list, keys are chromosomes, list entries are
@@ -867,6 +869,8 @@ def features_assign_chip_scores(feature_file, signal_files, outfolder,
     features = {}
     with open(feature_file, 'r') as f:
         for line in f:
+            if (line[0] == '#'):
+                continue
             items = np.array(line.rstrip().split())
             chr_, loc = items[feature_file_cols]
             chr_ = re.sub('chr', '', chr_)
@@ -930,10 +934,10 @@ def plot_aggregate_features(panels, gff, rad=99, binsize=500):
     ax[1][0].imshow(signal_norm_1)
     ax[2][0].imshow(signal_norm_2)
     ax[3][0].imshow(signal_norm_3)
-    ax[0][1].plot(insulation_score(signal_norm_all))
-    ax[1][1].plot(insulation_score(signal_norm_1))
-    ax[2][1].plot(insulation_score(signal_norm_2))
-    ax[3][1].plot(insulation_score(signal_norm_3))
+    ax[0][1].plot(insulation_cum_dist(signal_norm_all)[0])
+    ax[1][1].plot(insulation_cum_dist(signal_norm_1)[0])
+    ax[2][1].plot(insulation_cum_dist(signal_norm_2)[0])
+    ax[3][1].plot(insulation_cum_dist(signal_norm_3)[0])
 
 ############################################################################
 def plot_aggregate_features_compare(panels1, panels2, gff, rad=99, binsize=500):
@@ -977,20 +981,32 @@ def plot_aggregate_features_compare(panels1, panels2, gff, rad=99, binsize=500):
     sig2_norm_2 = aggregate_signal_gff_landmarks_norm(panels2, gff_2, rad, binsize)
     sig2_norm_3 = aggregate_signal_gff_landmarks_norm(panels2, gff_3, rad, binsize)
     
+    Rmost = (rad + 1) * binsize / 1000
+    Lmost = -1 * Rmost
+    min_dist = 10
+    x_vals = np.arange(min_dist, rad+1) * binsize / 1000
     fig, ax = plt.subplots(4,3, figsize=(15,15))
-    ax[0][0].imshow(sig1_norm_all)
-    ax[1][0].imshow(sig1_norm_1)
-    ax[2][0].imshow(sig1_norm_2)
-    ax[3][0].imshow(sig1_norm_3)
-    ax[0][1].imshow(sig2_norm_all)
-    ax[1][1].imshow(sig2_norm_1)
-    ax[2][1].imshow(sig2_norm_2)
-    ax[3][1].imshow(sig2_norm_3)
-    ax[0][2].plot(insulation_score(sig1_norm_all))
-    ax[0][2].plot(insulation_score(sig2_norm_all))
-    ax[1][2].plot(insulation_score(sig1_norm_1))
-    ax[1][2].plot(insulation_score(sig2_norm_1))
-    ax[2][2].plot(insulation_score(sig1_norm_2))
-    ax[2][2].plot(insulation_score(sig2_norm_2))
-    ax[3][2].plot(insulation_score(sig1_norm_3))
-    ax[3][2].plot(insulation_score(sig2_norm_3))
+    img1 = ax[0][0].imshow(sig1_norm_all, cmap='inferno')
+    img1.set_extent([Lmost, Rmost, Lmost, Rmost])
+    img2 = ax[1][0].imshow(sig1_norm_1, cmap='inferno')
+    img2.set_extent([Lmost, Rmost, Lmost, Rmost])
+    img3 = ax[2][0].imshow(sig1_norm_2, cmap='inferno')
+    img3.set_extent([Lmost, Rmost, Lmost, Rmost])
+    img4 = ax[3][0].imshow(sig1_norm_3, cmap='inferno')
+    img4.set_extent([Lmost, Rmost, Lmost, Rmost])
+    img5 = ax[0][1].imshow(sig2_norm_all, cmap='inferno')
+    img5.set_extent([Lmost, Rmost, Lmost, Rmost])
+    img6 = ax[1][1].imshow(sig2_norm_1, cmap='inferno')
+    img6.set_extent([Lmost, Rmost, Lmost, Rmost])
+    img7 = ax[2][1].imshow(sig2_norm_2, cmap='inferno')
+    img7.set_extent([Lmost, Rmost, Lmost, Rmost])
+    img8 = ax[3][1].imshow(sig2_norm_3, cmap='inferno')
+    img8.set_extent([Lmost, Rmost, Lmost, Rmost])
+    ax[0][2].plot(x_vals, insulation_cum_dist(sig1_norm_all, min_dist=min_dist)[0])
+    ax[0][2].plot(x_vals, insulation_cum_dist(sig2_norm_all, min_dist=min_dist)[0])
+    ax[1][2].plot(x_vals, insulation_cum_dist(sig1_norm_1, min_dist=min_dist)[0])
+    ax[1][2].plot(x_vals, insulation_cum_dist(sig2_norm_1, min_dist=min_dist)[0])
+    ax[2][2].plot(x_vals, insulation_cum_dist(sig1_norm_2, min_dist=min_dist)[0])
+    ax[2][2].plot(x_vals, insulation_cum_dist(sig2_norm_2, min_dist=min_dist)[0])
+    ax[3][2].plot(x_vals, insulation_cum_dist(sig1_norm_3, min_dist=min_dist)[0])
+    ax[3][2].plot(x_vals, insulation_cum_dist(sig2_norm_3, min_dist=min_dist)[0])
