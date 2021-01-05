@@ -5,10 +5,11 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import ipywidgets as widgets
 from ipywidgets import interact, IntSlider, Dropdown, IntRangeSlider, fixed, RadioButtons, IntText, Button, Layout, ToggleButton
-from ipywidgets import GridspecLayout
+from ipywidgets import GridspecLayout, HBox
 from IPython.display import display, clear_output
 import re
 import pandas as pd
+import gzip
 
 def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks=True):
     """Jupyter notebook viewer for Hi-C data
@@ -40,29 +41,60 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
             self.window_size = 200000
             self.track_data = {}
             self.posR = 10800000
-            self.track_files = set()
+            self.track_files = self.get_track_files(track_folder)
             self.track_data = {}
-            self.chr_maxes = {}
-    
+            self.chr_maxes = self.get_chr_maxes(data_folder)
+            self.distnorm_matrices = self.get_distnorm_matrices(data_folder)
+            self.distnorm = False
+
+        @staticmethod
+        def get_chr_maxes(data_folder):
+            """Find the maximum location (size) of each chromosome from files in the 
+            viewer data folder, return dict with chromosomes as keys and size as 
+            values."""
+            chr_maxes = {}
+            for filename in os.listdir(data_folder):
+                if not 'dist' in filename:
+                    if (filename[0] == '.'):
+                        continue
+                    chr_, pos1, pos2, binsizetxt = filename.split('_')
+                    max_ = int(pos1)
+                    if (chr_ not in chr_maxes):
+                        chr_maxes[chr_] = max_
+                    elif (max_ > chr_maxes[chr_]):
+                        chr_maxes[chr_] = max_
+            return chr_maxes
+
+        @staticmethod
+        def get_track_files(track_folder):
+            """Find all files in the track files folder, return set of file names."""
+            track_files = []
+            for filename in os.listdir(track_folder):
+                base = filename.split('.')[0]
+                track_files.append(base)
+                #track_files = track_files[1:] # Remove hidden macOS file.
+            return sorted(track_files[1:]) # Remove hidden macOS file.
+
+        @staticmethod
+        def get_distnorm_matrices(data_folder):
+            """Load distance normalization matrices for all resolutions."""
+            matrices = {}
+            for filename in os.listdir(data_folder):
+                if 'dist' in filename:
+                    f = re.sub('distnorm_matrix_', '', filename)
+                    f = re.sub('.txt', '', f)
+                    b = int(re.sub('.gz', '', f))
+                    matrices[b] = np.genfromtxt(os.path.join(data_folder, filename))
+            return matrices
+
+
+
+
     ############################################################################
     # General functions
     ############################################################################
     
-    def get_chr_maxes(data_folder):
-        """Find the maximum location (size) of each chromosome from files in the 
-        viewer data folder, return dict with chromosomes as keys and size as 
-        values."""
-        chr_maxes = {}
-        for filename in os.listdir(data_folder):
-            if (filename[0] == '.'):
-            	continue
-            chr_, pos1, pos2, binsizetxt = filename.split('_')
-            max_ = int(pos1)
-            if (chr_ not in chr_maxes):
-                chr_maxes[chr_] = max_
-            elif (max_ > chr_maxes[chr_]):
-                chr_maxes[chr_] = max_
-        return chr_maxes
+    
     
     def combine_colormaps(cm1, cm2):
         """Combine two mpl colormaps."""
@@ -84,39 +116,48 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
         x[np.isnan(x)] = dummy_val
         # Remove large outlier values using a percentile cutoff.
         upper_trim = 99.9
-        max_val = np.percentile(x, upper_trim)
-        x[x > max_val] = max_val
+        x = trim_outliers_percentile(x, 0, upper_trim)
         # Take the log.
         x = np.log(x)
         # Scale to a range of 0-1000.
         x = (x - np.min(x)) / (np.max(x) - np.min(x)) * 1000
         return(x)
     
+    def trim_outliers_percentile(x_in, lower, upper):
+        x = x_in.copy()
+        min_val = np.percentile(x, lower)
+        max_val = np.percentile(x, upper)
+        x[x > max_val] = max_val
+        x[x < min_val] = min_val
+        return x
+
     def load_track_data(trackfile_path):
         """Load genomic track data."""
         track_binsize = 500
         track_data = {}
-        with open(trackfile_path, 'r') as infile:
+        with gzip.open(trackfile_path, 'rt') as infile:
             for line in infile:
                 items = line.split()
-                (chr_, posL, posR, val) = items
+                (chr_, bin_, val) = items
                 chr_ = re.sub('chr', '', chr_)
                 if (chr_ in state.chr_maxes):
                     if (chr_ not in track_data):
                         max_bin = int(state.chr_maxes[chr_] / track_binsize)
                         track_data[chr_] = np.zeros(max_bin + 1000)
-                    track_bin = int(int(posL) / track_binsize)
-                    if (track_bin < len(track_data[chr_])):
-                        track_data[chr_][track_bin] = float(val)
+                    bin_ = int(bin_)
+                    if (bin_ < len(track_data[chr_])):
+                        track_data[chr_][bin_] = float(val)
         return track_data
-    
-    def get_track_files(track_folder):
-        """Find all files in the track files folder, return set of file names."""
-        track_files = []
-        for filename in os.listdir(track_folder):
-            base = filename.split('.')[0]
-            track_files.append(base)
-        return track_files[1:] # Remove hidden macOS file.
+
+    def normalize_distance(img):
+        """Normalize current frame from distance normalization matrix."""
+        norm_matrix = state.distnorm_matrices[state.binsize]
+        new_img = img - norm_matrix
+        lower_trim = 1
+        upper_trim = 99
+        new_img = trim_outliers_percentile(new_img, lower_trim, upper_trim)
+        new_img = (new_img - np.min(new_img)) / (np.max(new_img) - np.min(new_img)) * 1000
+        return new_img
     
     def update_position():
         """When a new position is specified by a change in chromosome, position, or 
@@ -126,6 +167,10 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
         if (os.path.isfile(file) or os.path.isfile(file + '.gz')): 
             # Load and draw Hi-C portion of figure.
             new_img = load_viewer_file(file)
+            # Normalize for distance if toggle engaged.
+            if state.distnorm:
+                new_img = normalize_distance(new_img)
+
             img.set_data(new_img)
             L_Mb = float(state.posL) / 1e6
             R_Mb = float(state.posR) / 1e6
@@ -229,13 +274,13 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
             description='Track',
         )
         track_dropdown.observe(track_dropdown_onchange, names="value")
-        first_track_file = os.path.join(track_folder, state.track_files[0] + '.txt')
+        first_track_file = os.path.join(track_folder, state.track_files[0] + '.txt.gz')
         state.track_data = load_track_data(first_track_file)
         return track_dropdown
     
     def track_dropdown_onchange(change):
         new_track_base = change['new']
-        track_filename = os.path.join(track_folder, new_track_base + '.txt')
+        track_filename = os.path.join(track_folder, new_track_base + '.txt.gz')
         state.track_data = load_track_data(track_filename)
         update_position()
     
@@ -336,34 +381,47 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
         fig.savefig(file_path, dpi=300)
         
     ############################################################################       
+    
+    # Toggle button to turn distance normalization on and off.
+    def make_distnorm_toggle():
+        distnorm_toggle = ToggleButton(
+            value=False,
+            description='Distnorm',
+            disabled=False,
+            button_style='',
+            tooltip='Normalize for distance',
+        )
+        distnorm_toggle.observe(distnorm_toggle_onchange, names="value")
+        return distnorm_toggle
+    
+    def distnorm_toggle_onchange(change):
+        status = change['new']
+        if (status == True):
+            state.distnorm = True
+            update_position()
+        else:
+            state.distnorm = False
+            update_position()
+        
+    ############################################################################       
     # Main.
     ############################################################################  
     
-    # Initialize state and widgets.
+    # Initialize state and widgets that require handling outside of creation function.
     state = State()
-    state.chr_maxes = get_chr_maxes(data_folder)
-    state.track_files = get_track_files(track_folder)
-    cmap_dropdown = make_cmap_dropdown()
-    chr_dropdown = make_chr_dropdown(data_folder, state.chr_maxes.keys())
-    contrast_slider = make_constrast_slider()
-    res_dropdown = make_resolution_dropdown()
     pos_slider = make_pos_slider()
-    grid_toggle = make_grid_toggle()
-    save_button = make_save_button()
-    
+
     # Use GridspecLayout to lay out widgets.
-    grid = GridspecLayout(4, 4, height='130px', grid_gap="0px", align_items="center")
-    grid[0,0] = chr_dropdown
-    grid[0,1] = res_dropdown
-    grid[0,2] = cmap_dropdown
+    grid = GridspecLayout(5, 4, height='130px', grid_gap="0px", align_items="center")
+    grid[0,0] = make_chr_dropdown(data_folder, state.chr_maxes.keys())
+    grid[0,1] = make_resolution_dropdown()
+    grid[0,2] = make_cmap_dropdown()
     grid[1,:2] = pos_slider
-    grid[2,:2] = contrast_slider
-    grid[2,2] = grid_toggle
-    grid[3,2] = save_button
+    grid[2,:2] = make_constrast_slider()
+    grid[2,2] = HBox([make_grid_toggle(), make_save_button(), make_distnorm_toggle()])
 
     if genometracks:
-    	track_dropdown = make_track_dropdown(track_folder)
-    	grid[1,2] = track_dropdown
+    	grid[1,2] = make_track_dropdown(track_folder)
 
     display(grid)    
     
