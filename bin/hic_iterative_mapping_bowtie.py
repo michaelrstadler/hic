@@ -77,7 +77,7 @@ if (file_to_map[-2:] == 'gz'):
 	p1 = subprocess.Popen(["gzip", "-cd", file_to_map], stdout=subprocess.PIPE)
 	call([ "./bowtie", num_cores, "-m1", "--best", "--strata", "--trim3", str(threeprime_trim),  "--un", unmapped_file, "--max", multiplyMapped_file, genome_path, "-", unique_file], stdin=p1.stdout)
 else:
-	call(["bowtie", num_cores, "-m1", "--best", "--strata", "--trim3", str(threeprime_trim),  "--un", unmapped_file, "--max", multiplyMapped_file, genome_path, file_to_map, unique_file])
+	call(["./bowtie", num_cores, "-m1", "--best", "--strata", "--trim3", str(threeprime_trim),  "--un", unmapped_file, "--max", multiplyMapped_file, genome_path, file_to_map, unique_file])
 
 cat_command = ["cat", unique_file]
 
@@ -93,7 +93,7 @@ for truncation_length in truncation_lengths:
 	file_to_map = multiplyMapped_file
 	multiplyMapped_file = file_stem + 'mappingV' + version + "_multiplyMapped_" + str(truncation_length) + ".fastq"
 	unique_file = file_stem + "unique_" + str(truncation_length) + ".bowtie"
-	call(["bowtie", num_cores, "-m1", "--best", "--strata", "--trim3", str(threeprime_trim), "--max", multiplyMapped_file, genome_path, file_to_map, unique_file])
+	call(["./bowtie", num_cores, "-m1", "--best", "--strata", "--trim3", str(threeprime_trim), "--max", multiplyMapped_file, genome_path, file_to_map, unique_file])
 	call(["rm", file_to_map])
 	cat_command.append(unique_file)
 	

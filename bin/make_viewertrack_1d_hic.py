@@ -85,8 +85,8 @@ outfilename = file_stem + '_1dBinCounts_' + str(bin_size) + '.txt'
 outfile = open(outfilename, 'w')
 for chr_ in bin_counts.keys():
 	for bin_ in range(0, max_bins[chr_]):
-		start = str(bin_ * bin_size)
-		end = str((bin_ * bin_size) + bin_size - 1)
+		#start = str(bin_ * bin_size)
+		#end = str((bin_ * bin_size) + bin_size - 1)
 		val = str(bin_counts[chr_][bin_])
-		outfile.write(chr_ + '\t' + start + '\t' + end + '\t' + val + '\n')
+		outfile.write(chr_ + '\t' + str(bin_) + '\t' + val + '\n')
 outfile.close()

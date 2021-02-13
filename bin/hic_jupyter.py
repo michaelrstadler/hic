@@ -10,6 +10,7 @@ from IPython.display import display, clear_output
 import re
 import pandas as pd
 import gzip
+from datetime import date
 
 def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks=True):
     """Jupyter notebook viewer for Hi-C data
@@ -70,10 +71,11 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
             """Find all files in the track files folder, return set of file names."""
             track_files = []
             for filename in os.listdir(track_folder):
-                base = filename.split('.')[0]
-                track_files.append(base)
-                #track_files = track_files[1:] # Remove hidden macOS file.
-            return sorted(track_files[1:]) # Remove hidden macOS file.
+                if not (re.search('DS_Store', filename)):
+                    base = filename.split('.')[0]
+                    track_files.append(base)
+                    #track_files = track_files[1:] # Remove hidden macOS file.
+            return sorted(track_files) # Remove hidden macOS file.
 
         @staticmethod
         def get_distnorm_matrices(data_folder):
@@ -402,14 +404,35 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
         else:
             state.distnorm = False
             update_position()
-        
+    
+    ############################################################################   
+
+    # Save coordinates of mouse clicks to a file.
+    def click_coord(event):
+        f = open(coord_filename, 'a')
+        f.write(state.chr + '\t' + str(event.xdata) + '\t' + str(event.ydata) + '\n')
+        t.close()
+
+        if(event.inaxes == ax):
+            t.write(event.xdata, event.ydata)
+
+    def make_coord_file(save_folder, data_folder):
+        for n in range(1, 100):
+            test = os.path.join(save_folder, 'clickedcoords_' + str(date.today()) + '-' + str(n) + '.txt')
+            if not os.path.exists(test):
+                f = open(test, 'w')
+                f.write('#' + data_folder + '\n')
+                f.close()
+                return test
+
     ############################################################################       
     # Main.
-    ############################################################################  
-    
+    ############################################################################      
+
     # Initialize state and widgets that require handling outside of creation function.
     state = State()
     pos_slider = make_pos_slider()
+
 
     # Use GridspecLayout to lay out widgets.
     grid = GridspecLayout(5, 4, height='130px', grid_gap="0px", align_items="center")
@@ -434,6 +457,11 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
     	fig, ax = plt.subplots()
     	ax = [ax]
     img = ax[0].imshow(np.zeros((400,400)), vmin=0, vmax=1000, cmap=state.cmap, interpolation="none")
+
+    # Create file for storing clicked coordinates and initialize function.
+    coord_filename = make_coord_file(save_folder, data_folder)
+    cid = fig.canvas.mpl_connect('button_press_event', click_coord)
+
     update_position()
 
 ############################################################################
