@@ -21,24 +21,17 @@ def parse_options():
 	parser = OptionParser()
 	parser.add_option("-f", "--file", dest="filename",
 					  help="Reduced bin file", metavar="FILE")
+	parser.add_option("-o", "--outfolder", dest="outfolder",
+					  help="Path for output files", metavar="OUTFOLDER")
+	parser.add_option("-c", "--chromosome", dest="chromosome",
+					  help="Chromosome", metavar="CHROMOSOME")
 	parser.add_option("-w", "--windowsize", dest="windowsize", default=400,
 					  help="Panel width, in bins", metavar="WINDOWSIZE")
 	parser.add_option("-s", "--stepsize", dest="stepsize", default=200,
 					  help="Step size, in bins", metavar="STEPSIZE")
-	parser.add_option("-o", "--outfile_stem", dest="outfile_stem",
-					  help="Path and chromosome for outfiles", metavar="OUTSTEM")
+	
 	(options, args) = parser.parse_args()
-	return options
-
-def get_max_bin_chr(file):
-	"""Retrieve the chromosome name and maximum bin from input file."""
-	with open(file, 'rb') as f:
-	    f.seek(-2, os.SEEK_END)
-	    while f.read(1) != b'\n':
-	        f.seek(-2, os.SEEK_CUR) 
-	    last_line = (f.readline().decode())
-	last_line_items = last_line.split()
-	return((last_line_items[0], int(last_line_items[1])))            	
+	return options          	
 
 def rebin_2d(arr, new_shape):
 	"""Bin a 2D numpy array to fit a new shape, with each entry
@@ -59,14 +52,16 @@ def rebin_1d(arr, new_shape):
 options = parse_options()
 input_binsize = 500
 arb_constant = 10000000 #gets multiplied by the normalized coverage to avoid small number issues
-bin_combinations = [1,2,4,8]
+bin_combinations = [1,2,4,8, 16, 32]
 stepsize = int(options.stepsize)
 windowsize = int(options.windowsize)
-outfile_stem = options.outfile_stem
+outfolder = options.outfolder
 f = options.filename
-(chromosome, max_bin) = get_max_bin_chr(f)
-total_counts = np.zeros(max_bin + 1)
-bin_bin_counts = np.zeros((max_bin+1, max_bin+1))
+chromosome = options.chromosome
+max_bin = 0
+init_max_bin = int(1e6) # For initial memory assignment, max size of 1 million bins.
+total_counts = np.zeros(init_max_bin)
+bin_bin_counts = np.zeros((init_max_bin, init_max_bin))
 
 # Handle gzipped files.
 if (f[-2:] == 'gz'):
@@ -87,6 +82,9 @@ for line in file1:
 		# of total counts is determined from the largest bin in bin-bin counts, this creates an error.
 		if (bin_ < len(total_counts)):
 			total_counts[int(bin_)] = int(float(count)) #int of '0.0' throws error...have to go through float for some reason
+		# Check/update max bin.
+		if (bin_ > max_bin):
+			max_bin = bin_
 	# Add non-# lines to bin-bin counts.
 	else:
 		(chr, bin1, bin2, count) = line.split('\t')
@@ -128,6 +126,6 @@ for bins_combine in bin_combinations:
 			# Write file for normalized matrix.
 			pos1 = panel_start * input_binsize
 			pos2 = pos1 + windowsize_new * input_binsize
-			outfilename = outfile_stem + '_' + str(pos1) + '_' + str(pos2) + '_' + str(binsize_new) + '.txt.gz'
+			outfilename = os.path.join(outfolder , chromosome + '_' + str(pos1) + '_' + str(pos2) + '_' + str(binsize_new) + '.txt.gz')
 			np.savetxt(outfilename, panel_binned_norm, newline='\n', fmt='%.6e')
 

@@ -253,7 +253,7 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
     # Dropdown to change resolution.
     def make_resolution_dropdown():
         res_dropdown = Dropdown(
-            options=['500', '1000', '2000', '4000'],
+            options=['500', '1000', '2000', '4000', '8000', '16000'],
             value='2000',
             description='Resolution',
         )
