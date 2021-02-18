@@ -24,10 +24,18 @@ def parse_options():
 
 	(options, args) = parser.parse_args()
 	return options
-            
-options = parse_options()
-data_folder = options.data_folder
-size = int(options.size)
+
+def get_bin_sizes(folder):
+    """Find all bin sizes in folder."""
+    bin_sizes = {}
+    for f in os.listdir(data_folder):
+        f = f.rstrip()
+        items = f.split('_')
+        if (len(items) == 4):
+            binsize = int(re.sub('.txt.gz', '', items[3]))
+            bin_sizes[binsize] = 1
+    return bin_sizes.keys()
+
 
 def make_distance_normalize_matrix(data_folder, size, bin_size):
     """Create distnorm matrix for a bin size."""
@@ -40,7 +48,7 @@ def make_distance_normalize_matrix(data_folder, size, bin_size):
 
     for filename in os.listdir(data_folder):
         if binfile_match in filename:
-            x = hc.load_viewer_file(os.path.join(data_folder, filename))
+            x = hc.load_viewer_file(os.path.join(data_folder, filename), norm=False)
             # For each distance off diagonal.
             for d in range(0, size):
             	# Get all values of this file at distance d from diagonal.
@@ -59,11 +67,18 @@ def make_distance_normalize_matrix(data_folder, size, bin_size):
     norm_mat = np.zeros((size, size))
     for n in range(0, size):
         norm_mat[diag_dist == n] = means[n]
+    # Normalize to 0-1000 (to match normalization of viewer files).
+    norm_mat = (norm_mat - np.min(norm_mat)) / (np.max(norm_mat) - np.min(norm_mat)) * 1000
     # Write file.
     outfilepath = os.path.join(data_folder, 'distnorm_matrix_' + str(bin_size) + '.txt.gz')   
     np.savetxt(outfilepath, norm_mat, newline='\n', fmt='%.6e')
 
-for bin_size in [500, 1000, 2000, 4000]:
+options = parse_options()
+data_folder = options.data_folder
+size = int(options.size)
+bin_sizes = get_bin_sizes(data_folder)
+
+for bin_size in bin_sizes:
     print(str(bin_size) + ' bp')
     make_distance_normalize_matrix(data_folder=data_folder, size=size, bin_size=bin_size)
 

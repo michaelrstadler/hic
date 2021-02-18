@@ -191,7 +191,8 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
 	            track_binL = int(state.posL / track_binsize)
 	            track_binR = int(state.posR / track_binsize)
 	            ax[1].cla()
-	            ax[1].plot(state.track_data[state.chr][np.arange(track_binR, track_binL, -1)], np.arange(track_binL, track_binR))
+                ax[1].cla()
+
 	            ax[1].set_ylim(track_binL, track_binR)
 	            ax[1].set_yticklabels([])
 	            ax[1].set_xticklabels([])
@@ -468,7 +469,7 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
 # Utility functions
 ############################################################################
 
-def load_viewer_file(infilename, size=400):
+def load_viewer_file(infilename, norm=True, size=400):
         """Load viewer file of a Hi-C matrix, replace 0s and NaNs with dummy values, 
         trim outliers, take log.
         
@@ -496,7 +497,8 @@ def load_viewer_file(infilename, size=400):
         # Take the log.
         x = np.log(x)
         # Scale to a range of 0-1000.
-        x = (x - np.min(x)) / (np.max(x) - np.min(x)) * 1000
+        if (norm):
+            x = (x - np.min(x)) / (np.max(x) - np.min(x)) * 1000
         return(x)
 
 ############################################################################
