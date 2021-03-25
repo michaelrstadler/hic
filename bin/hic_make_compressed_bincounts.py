@@ -135,4 +135,5 @@ for chr in bin_totals.keys():
 				if ((bin2_orig >= 0) and (bin2_orig <= max_bin[chr])):
 					if (bin_bin_counts[chr][bin1][bin2] > 0):
 						outfile.write(chr + '\t' + str(bin1) + '\t' + str(bin2_orig) + '\t' + str(bin_bin_counts[chr][bin1][bin2]) + '\n')
+	del(bin_bin_counts[chr])
 print("Done.")

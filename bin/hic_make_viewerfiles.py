@@ -107,7 +107,8 @@ for bins_combine in bin_combinations:
 	# simply divide the data matrix by the normalization matrix (and multiply by a suitable constant).
 	for panel_start in range(0, max_bin, stepsize_new):
 		panel_end = panel_start + windowsize_new
-		if (panel_end <= max_bin):
+		# CHANGE CHANGE CHANGE!!!!!!!!!!!!!!!!
+		if (panel_start <= max_bin):
 			# Slice panel from bin-bin data; will be a larger matrix for larger bin combinations.
 			panel = bin_bin_counts[panel_start:panel_end, panel_start:panel_end]
 			# Bin panel to match desired window size. Binning to fixed size with different sized inputs

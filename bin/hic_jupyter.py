@@ -11,6 +11,7 @@ import re
 import pandas as pd
 import gzip
 from datetime import date
+from subprocess import check_call
 
 def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks=True):
     """Jupyter notebook viewer for Hi-C data
@@ -23,9 +24,9 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
         save_folder: string or file object
             Folder to save images to.
         oldformat: bool
-        	If true, expects viewer files with column and row names.
+            If true, expects viewer files with column and row names.
         genometracks: bool
-        	If true, displays genomic tracks from track_folder.
+            If true, displays genomic tracks from track_folder.
             
     Returns: None
         
@@ -109,9 +110,9 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
         """Load viewer file of a Hi-C matrix, replace 0s and NaNs with dummy values, 
         trim outliers, take log."""
         if (oldformat):
-        	x = np.genfromtxt(infilename, delimiter='\t', skip_header=1)[:,1:]
+            x = np.genfromtxt(infilename, delimiter='\t', skip_header=1)[:,1:]
         else:
-        	x = np.genfromtxt(infilename)
+            x = np.genfromtxt(infilename)
         # Resolve 0s and NaNs by setting to dummy value 0.1.
         dummy_val = 0.1
         x[x == 0] = dummy_val
@@ -186,24 +187,27 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
             ax[0].set_yticks(minorticks, minor=True)
 
             if genometracks:
-	            # Draw genomic track portion of figure.
-	            track_binsize = 500
-	            track_binL = int(state.posL / track_binsize)
-	            track_binR = int(state.posR / track_binsize)
-	            ax[1].cla()
+                # Draw genomic track portion of figure.
+                track_binsize = 500
+                track_binL = int(state.posL / track_binsize)
+                track_binR = int(state.posR / track_binsize)
                 ax[1].cla()
-
-	            ax[1].set_ylim(track_binL, track_binR)
-	            ax[1].set_yticklabels([])
-	            ax[1].set_xticklabels([])
-	            ax[1].set_xticks([])
-	            ax[1].set_yticks([])
+                ax[1].axvline(0, color="gray", alpha=0.5)
+                if (state.chr in state.track_data):
+                    ax[1].plot(state.track_data[state.chr][np.arange(track_binR, track_binL, -1)], np.arange(track_binL, track_binR))
+                else:
+                    ax[1].plot(np.zeros(track_binR - track_binL), np.arange(track_binL, track_binR))
+                ax[1].set_ylim(track_binL, track_binR)
+                ax[1].set_yticklabels([])
+                ax[1].set_xticklabels([])
+                ax[1].set_xticks([])
+                ax[1].set_yticks([])
             
             # Execute changes on screen.
             fig.canvas.draw_idle()
             
         else:
-            print(file)
+            #print(file)
             ax[0].set_title('Position is out of bounds!', fontsize=14)
 
     ############################################################################
@@ -235,6 +239,8 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
     
     # Dropdown to change chromosome.
     def make_chr_dropdown(data_folder, chrs):
+        chrs = list(chrs)
+        chrs.sort()
         chr_dropdown = Dropdown(
             options=chrs,
             description='Chrom',
@@ -412,10 +418,7 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
     def click_coord(event):
         f = open(coord_filename, 'a')
         f.write(state.chr + '\t' + str(event.xdata) + '\t' + str(event.ydata) + '\n')
-        t.close()
-
-        if(event.inaxes == ax):
-            t.write(event.xdata, event.ydata)
+        f.close()
 
     def make_coord_file(save_folder, data_folder):
         for n in range(1, 100):
@@ -445,18 +448,18 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
     grid[2,2] = HBox([make_grid_toggle(), make_save_button(), make_distnorm_toggle()])
 
     if genometracks:
-    	grid[1,2] = make_track_dropdown(track_folder)
+        grid[1,2] = make_track_dropdown(track_folder)
 
     display(grid)    
     
     # Draw the initial figure.
     chosen_value=5
     if (genometracks):
-    	fig, ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [15, 1]}, figsize=(chosen_value, 1.05 * chosen_value / 2))
-    	fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=-0.4, hspace=None)
+        fig, ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [15, 1]}, figsize=(chosen_value, 1.05 * chosen_value / 2))
+        fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=-0.4, hspace=None)
     else:
-    	fig, ax = plt.subplots()
-    	ax = [ax]
+        fig, ax = plt.subplots()
+        ax = [ax]
     img = ax[0].imshow(np.zeros((400,400)), vmin=0, vmax=1000, cmap=state.cmap, interpolation="none")
 
     # Create file for storing clicked coordinates and initialize function.
@@ -500,6 +503,59 @@ def load_viewer_file(infilename, norm=True, size=400):
         if (norm):
             x = (x - np.min(x)) / (np.max(x) - np.min(x)) * 1000
         return(x)
+
+############################################################################
+def load_track_data(trackfile_path):
+    """Load genomic track data.
+
+    Args:
+        trackfile_path: str
+            Path to genomic track file, format chr [tab] bin [tab] value
+
+    Returns:
+        track_data: dict of np arrays
+            Keys are chromosomes, arrays contain values in bins matching
+            size of input data
+    """
+    track_data = {}
+    max_bin = {}
+    with gzip.open(trackfile_path, 'rt') as infile:
+        for line in infile:
+            items = line.split()
+            (chr_, bin_, val) = items
+            chr_ = re.sub('chr', '', chr_)
+            if (chr_ not in track_data):
+                track_data[chr_] = np.zeros(int(1e8 / 500))
+            bin_ = int(bin_)
+            if (chr_ not in max_bin):
+                max_bin[chr_] = 0
+            if (bin_ > max_bin[chr_]):
+                max_bin[chr_] = bin_
+            if (bin_ < len(track_data[chr_])):
+                track_data[chr_][bin_] = float(val)
+
+        for chr_ in max_bin:
+            track_data[chr_] = track_data[chr_][0:(max_bin[chr_]+1)]
+    return track_data
+
+############################################################################
+def write_track_data(track_data, outfile):
+    """Write genomic track data files from data.
+
+    Args:
+        track_data: dict of np arrays
+            Keys are chromosomes, arrays contain values in bins
+        outfile: str
+            File to write to,format chr [tab] bin [tab] value.
+            Only non-zero values are written.       
+    """
+    out = open(outfile, 'w')
+    for chr_ in track_data:
+        for i in range(0, len(track_data[chr_])):
+            val = track_data[chr_][i]
+            if (val > 0):
+                out.write(chr_ + '\t' + str(i) + '\t' + str(val) + '\n')
+    check_call(['gzip', outfile])
 
 ############################################################################
 def panels_old_to_new_format(old_folder, new_folder):
@@ -838,20 +894,20 @@ def insulation_cum_dist(agg_orig, buffer=2, min_dist=3, max_dist=100, binsize=50
     region to the "not across" region.
     
     Args:
-    	agg_orig: numpy ndarray
-			Aggregate Hi-C matrix
-		buffer: int
-			Number of bins on either side of the boundary (feature) to omit in calculation
-		min_dist: int
-			Starting distance from diagonal to compute
-		max_dist: int
-			Ending distance from diagonal to compute
+        agg_orig: numpy ndarray
+            Aggregate Hi-C matrix
+        buffer: int
+            Number of bins on either side of the boundary (feature) to omit in calculation
+        min_dist: int
+            Starting distance from diagonal to compute
+        max_dist: int
+            Ending distance from diagonal to compute
 
-	Returns:
-		scores: list
-			Insulation scores by distance
-		distances: list
-			Matching genomic distances
+    Returns:
+        scores: list
+            Insulation scores by distance
+        distances: list
+            Matching genomic distances
     """
     agg = agg_orig.copy()
     # Reset minimum value to 0 to avoid negative number problems.
