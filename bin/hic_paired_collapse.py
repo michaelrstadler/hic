@@ -37,17 +37,15 @@ outfile_handle = open(outfile_name, 'w')
 
 for f in infiles:
     if (f[-2:] == 'gz'):
-        print('hello')
         file_handle = gzip.open(f, 'rt')
     else:
-        print('hellno')
         file_handle = open(f, 'r')
 
     for line in file_handle:
         total_reads += 1
         line = line.rstrip()
         data = line.split('\t')
-        combo_string = ''.join(data[1:7])
+        combo_string = '_'.join(data[1:7])
         if(not combo_string in alignments):
             outfile_handle.write(line + '\n')
             alignments[combo_string] = 1
