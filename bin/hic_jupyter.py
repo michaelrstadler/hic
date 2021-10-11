@@ -12,6 +12,7 @@ import pandas as pd
 import gzip
 from datetime import date
 from subprocess import check_call
+from skimage import exposure
 
 def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks=True):
     """Jupyter notebook viewer for Hi-C data
@@ -48,6 +49,7 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
             self.chr_maxes = self.get_chr_maxes(data_folder)
             self.distnorm_matrices = self.get_distnorm_matrices(data_folder)
             self.distnorm = False
+            self.histeq = False
 
         @staticmethod
         def get_chr_maxes(data_folder):
@@ -173,6 +175,10 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
             # Normalize for distance if toggle engaged.
             if state.distnorm:
                 new_img = normalize_distance(new_img)
+            if state.histeq:
+                # equalize_adapthist requires image values between -1 and 1, returns values 
+                # in same range. Must multiply for viewing.
+                new_img = exposure.equalize_adapthist(new_img / 1000, clip_limit=0.03) * 1000 
 
             img.set_data(new_img)
             L_Mb = float(state.posL) / 1e6
@@ -207,7 +213,6 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
             fig.canvas.draw_idle()
             
         else:
-            #print(file)
             ax[0].set_title('Position is out of bounds!', fontsize=14)
 
     ############################################################################
@@ -411,6 +416,29 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
         else:
             state.distnorm = False
             update_position()
+
+    ############################################################################       
+    
+    # Toggle button to turn histogram equalization on and off.
+    def make_histeq_toggle():
+        histeq_toggle = ToggleButton(
+            value=False,
+            description='HistEq',
+            disabled=False,
+            button_style='',
+            tooltip='Equalize histogram',
+        )
+        histeq_toggle.observe(histeq_toggle_onchange, names="value")
+        return histeq_toggle
+    
+    def histeq_toggle_onchange(change):
+        status = change['new']
+        if (status == True):
+            state.histeq = True
+            update_position()
+        else:
+            state.histeq = False
+            update_position()
     
     ############################################################################   
 
@@ -445,7 +473,7 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
     grid[0,2] = make_cmap_dropdown()
     grid[1,:2] = pos_slider
     grid[2,:2] = make_constrast_slider()
-    grid[2,2] = HBox([make_grid_toggle(), make_save_button(), make_distnorm_toggle()])
+    grid[2,2] = HBox([make_grid_toggle(), make_save_button(), make_distnorm_toggle(), make_histeq_toggle()])
 
     if genometracks:
         grid[1,2] = make_track_dropdown(track_folder)
