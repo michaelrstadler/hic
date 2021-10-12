@@ -35,15 +35,11 @@ def parse_options():
                 
 options = parse_options()
 bin_size = int(options.bin_size)
-bin_counts = {}
-max_bins = {}
+chr_counts = {}
 filenames = options.filenames
 files = filenames.split(',')
 line_count = 0
-max_chr_size = int(options.max_chr_size)
-min_chr_size = 1e6
-max_chr_bins = int(max_chr_size // bin_size)
-min_chr_bins = int(min_chr_size // bin_size)
+
 species = options.species
 chr_lists = {
 	'mel': ['2L', '2R', '3L', '3R', 'X', '4', 'Y'],
@@ -59,20 +55,14 @@ chr_lists = {
 }
 chromosomes = chr_lists[species]
 
-def add_read(chr1, chr2, bin1, bin2, bin_counts, max_chr_bins, chromosomes):
+def add_read(chr1, chr2, chr_counts, chromosomes):
 	if ((chr1 in chromosomes) and (chr2 in chromosomes)):
-		if (chr1 not in bin_counts):
-			bin_counts[chr1] = {}
-		if (chr2 not in bin_counts[chr1]):
-			bin_counts[chr1][chr2] = np.zeros((max_chr_bins, max_chr_bins))
-		bin_counts[chr1][chr2][bin1][bin2] += 1
+		if (chr1 not in chr_counts):
+			chr_counts[chr1] = {}
+		if (chr2 not in chr_counts[chr1]):
+			chr_counts[chr1][chr2] = 0
+		chr_counts[chr1][chr2] += 1
 
-
-def update_max(chr_, bin_, max_bins):
-	if (chr_ not in max_bins):
-		max_bins[chr_] = bin_
-	elif(bin_ > max_bins[chr_]):
-		max_bins[chr_] = bin_
 
 for f in files:
 	print('Reading ' + f + '...')
@@ -88,13 +78,11 @@ for f in files:
 		line = line.rstrip()
 		items = line.split()
 		(chr1, Lmost1, chr2, Lmost2) = items[2], int(items[3]), items[5], int(items[6])
-		bin1 = int(Lmost1 / bin_size)
-		bin2 = int(Lmost2 / bin_size) 
-		add_read(chr1, chr2, bin1, bin2, bin_counts, max_chr_bins, chromosomes)
 
-		add_read(chr2, chr1, bin2, bin1, bin_counts, max_chr_bins, chromosomes)
-		update_max(chr1, bin1, max_bins)
-		update_max(chr2, bin2, max_bins)
+		add_read(chr1, chr2, chr_counts, chromosomes)
+		if chr1 != chr2:
+			add_read(chr2, chr1, chr_counts, chromosomes)
+
 	file1.close()
 file_stem = ''
 
@@ -104,31 +92,25 @@ else:
 	file_stem = options.file_stem
 
 #outfile = open(file_stem + '_binCounts_' + str(bin_size // 1000) + 'kB.txt','w')
-outfilename = file_stem + '_binCounts_' + str(bin_size // 1000) + 'kB.txt'
-
+outfilename = file_stem + '_chrCounts.txt'
+outfile = open(outfilename, 'w')
 
 #print column labels
-"""
-for chr3 in chromosomes:
-	for bin3 in range(0, max_bins[chr3] + 1):
-		outfile.write('\tchr' + chr3 + '_' + str(bin3))
+outfile.write(chromosomes[0])
+
+for chr3 in chromosomes[1:]:
+	outfile.write('\t' + chr3)
 outfile.write('\n')
-"""
+
 
 #chromosomes = filter_chr_size(list(bin_counts.keys()), max_bins, min_chr_bins)
 
 for chr1 in chromosomes:
+	outfile.write(chr1)
+	for chr2 in chromosomes:
+		try:
+			outfile.write('\t' + str(chr_counts[chr1][chr2]))
+		except:
+			outfile.write('\t0')
+	outfile.write('\n')
 
-	data_this_chr = bin_counts[chr1][chromosomes[0]][0:(max_bins[chr1]+1), 0:(max_bins[chromosomes[0]]+1)]
-	
-	for chr2 in chromosomes[1:]:
-		if (chr2 in bin_counts[chr1]):
-			data_this_chr = np.hstack((data_this_chr, bin_counts[chr1][chr2][0:(max_bins[chr1]+1),0:(max_bins[chr2]+1)]))
-		else:
-			data_this_chr = np.hstack((data_this_chr, np.zeros((max_bins[chr1]+1,max_bins[chr2]+1))))
-	if (chr1 == chromosomes[0]):
-		data_all = data_this_chr
-	else:
-		data_all = np.vstack((data_all, data_this_chr))
-
-np.savetxt(outfilename, data_all, newline='\n', fmt='%.6e')
