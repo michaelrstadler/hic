@@ -46,6 +46,7 @@ max_chr_bins = int(max_chr_size // bin_size)
 min_chr_bins = int(min_chr_size // bin_size)
 species = options.species
 chr_lists = {
+	'2L': ['2L'],
 	'mel': ['2L', '2R', '3L', '3R', 'X', '4', 'Y'],
 	'vir': ['scaffold_13049','scaffold_12963','scaffold_13047','scaffold_12875','scaffold_12855',
 	'scaffold_12970','scaffold_12723','scaffold_12928','scaffold_12822','scaffold_13042','scaffold_12958',

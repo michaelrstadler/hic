@@ -44,7 +44,6 @@ fi
 #set stetp size equal to bin size i.e. non-overlapping intervals
 step_size=$bin_size
 
-echo 'got here'
 ###################################################
 ###EXTRACT DENSITIES FROM NORMALIZED BIGWIG FILES
 ###################################################
@@ -56,8 +55,8 @@ echo "track type=wiggle_0 name=$mylab description=\"fixedStep format\""
 #for each chromsome
 while read line; do
  
-  cur_chr=$(echo $line | cut --delimiter=" " -f1)
-  cur_length=$(echo $line | cut --delimiter=" " -f2)
+  cur_chr=$(echo $line | cut -d " " -f1)
+  cur_length=$(echo $line | cut -d " " -f2)
   
   n_bins=$(echo "scale=0; (${cur_length}-${step_size})/${bin_size}" | bc)
  

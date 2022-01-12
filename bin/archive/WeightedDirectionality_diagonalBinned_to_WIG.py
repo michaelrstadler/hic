@@ -4,7 +4,7 @@ and counts the linkages between that bin and the bins to the left and the right,
 both the distance included, and the directly adjacent bins to skip, submitted by the user.
 So for 1 kb bins, inputs of -w 10 -d 3 would add up all the linkages between the bin and
 bins between 3 and 10 kb to its left and to its right. The L/R score is just the simple
-log ratio of right to left.
+log ratio of right to left. 
 
 Added a weight for the total reads used to compute directionality for a given bin. The L/R
 directionality score is scaled by a, such that weighted directionality = (raw directionality)^a.

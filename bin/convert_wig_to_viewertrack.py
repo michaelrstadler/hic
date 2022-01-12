@@ -76,8 +76,9 @@ for line in infile:
 		elif(len(line_values) == 1):
 			value = line
 			pos = curr_pos
-			posR = posL + curr_span
+			posR = pos + curr_span
 			curr_pos = posR
+			chr_ = curr_chr
 
 		bin_ = int(pos) // bin_size
 		value = float(value)
