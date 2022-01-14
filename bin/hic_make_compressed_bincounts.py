@@ -24,52 +24,52 @@ import numpy as np
 from scipy.sparse import dok_matrix
 
 def parse_options():
-	parser = OptionParser()
-	parser.add_option("-f", "--files", dest="filenames",
-					  help="paired alignment files, comma separated", metavar="FILE")
-	
-	parser.add_option("-b", "--bin_size",
-					   dest="bin_size", default=1000000,
-					  help="bin size")
-	
-	parser.add_option("-w", "--width",
-					   dest="width", default=1000,
-					  help="width in bins from diagonal")
+    parser = OptionParser()
+    parser.add_option("-f", "--files", dest="filenames",
+                      help="paired alignment files, comma separated", metavar="FILE")
+    
+    parser.add_option("-b", "--bin_size",
+                       dest="bin_size", default=1000000,
+                      help="bin size")
+    
+    parser.add_option("-w", "--width",
+                       dest="width", default=1000,
+                      help="width in bins from diagonal")
 
-	
-	parser.add_option("-s", "--file_stem",
-						dest="file_stem", default='none',
-					  help="output file stem. Adds diag_bin_counts bin size and chr")
+    
+    parser.add_option("-s", "--file_stem",
+                        dest="file_stem", default='none',
+                      help="output file stem. Adds diag_bin_counts bin size and chr")
 
-	(options, args) = parser.parse_args()
-	return options
+    (options, args) = parser.parse_args()
+    return options
             
 
 def Add_read (chr, bin1, bin2, num_bins):
-	"""Add a new read to bin_bin_counts."""
-	if (chr not in bin_bin_counts):
-		bin_bin_counts[chr] = dok_matrix((num_bins, (2 * width) + 1))
-	# Assign bin2 as a relative position to bin1.
-	bin2_rel = (bin2 - bin1) + width
-	bin_bin_counts[chr][bin1, bin2_rel] = bin_bin_counts[chr][bin1, bin2_rel] + 1
-	
+    """Add a new read to bin_bin_counts."""
+    if (chr not in bin_bin_counts):
+        bin_bin_counts[chr] = dok_matrix((num_bins, (2 * width) + 1))
+    # Assign bin2 as a relative position to bin1.
+    bin2_rel = (bin2 - bin1) + width
+    bin_bin_counts[chr][bin1, bin2_rel] = bin_bin_counts[chr][bin1, bin2_rel] + 1
+    
 
 def add_to_totals(chr, bin, num_bins):
-	"""Add count to total bin counts."""
-	if (chr in bin_totals):
-		bin_totals[chr][bin] = bin_totals[chr][bin] + 1
-	else:
-		bin_totals[chr] = np.zeros(num_bins)
+    """Add count to total bin counts."""
+    if (chr in bin_totals):
+        bin_totals[chr][bin] = bin_totals[chr][bin] + 1
+    else:
+        bin_totals[chr] = np.zeros(num_bins)
 
 def update_max_bin(chr, bin1, bin2):
-	"""Check if new read contains maximum observed bin for chromosome, update if so."""
-	if (chr in max_bin):
-		return(max(bin1, bin2, max_bin[chr]))
-	else:
-		return(max(bin1, bin2))
+    """Check if new read contains maximum observed bin for chromosome, update if so."""
+    if (chr in max_bin):
+        return(max(bin1, bin2, max_bin[chr]))
+    else:
+        return(max(bin1, bin2))
 
 # Main:
-	
+    
 options = parse_options()
 bin_size = int(options.bin_size)
 filenames = options.filenames
@@ -85,56 +85,56 @@ line_count = 0 # Keep track of lines processed.
 # Read mapping file into memory.
 print('Reading files:')
 for f in files:
-	print(f)
-	if (f[-2:] == 'gz'):
-		infile = gzip.open(f, 'rt')
-	else:
-		infile = open(f, 'r')
+    print(f)
+    if (f[-2:] == 'gz'):
+        infile = gzip.open(f, 'rt')
+    else:
+        infile = open(f, 'r')
 
-	for line in infile:
-		line_count = line_count + 1
-		if (line_count % 10000000 == 0):
-			print('. ' + str(line_count / 10000000))
-		line = line.rstrip()
-		items = line.split()
-		(chr1, Lmost1, chr2, Lmost2) = items[2], int(items[3]), items[5], int(items[6])
-		if ((chr1 == chr2)):
-			bin1 = int(Lmost1 / bin_size)
-			bin2 = int(Lmost2 / bin_size)
-			add_to_totals(chr1, bin1, num_bins)
-			if (bin1 != bin2):
-				add_to_totals(chr1, bin2, num_bins) 
-			max_bin[chr1] = update_max_bin(chr1, bin1, bin2)
-			if (abs(bin1 - bin2) <= width):
-				Add_read(chr1, bin1, bin2, num_bins) # Avoid double counting on diagonal. This will be triggered unless chromosome and bin are the same
-				if (bin1 != bin2):
-					Add_read(chr1, bin2, bin1, num_bins)
-	infile.close()
+    for line in infile:
+        line_count = line_count + 1
+        if (line_count % 10000000 == 0):
+            print('. ' + str(line_count / 10000000))
+        line = line.rstrip()
+        items = line.split()
+        (chr1, Lmost1, chr2, Lmost2) = items[2], int(items[3]), items[5], int(items[6])
+        if ((chr1 == chr2)):
+            bin1 = int(Lmost1 / bin_size)
+            bin2 = int(Lmost2 / bin_size)
+            add_to_totals(chr1, bin1, num_bins)
+            if (bin1 != bin2):
+                add_to_totals(chr1, bin2, num_bins) 
+            max_bin[chr1] = update_max_bin(chr1, bin1, bin2)
+            if (abs(bin1 - bin2) <= width):
+                Add_read(chr1, bin1, bin2, num_bins) # Avoid double counting on diagonal. This will be triggered unless chromosome and bin are the same
+                if (bin1 != bin2):
+                    Add_read(chr1, bin2, bin1, num_bins)
+    infile.close()
 print('done reading\n')
 
 # Set up output file stem
 file_stem = ''
 if (options.file_stem == 'none'):
-	file_stem = re.sub('.txt', '', files[0])
+    file_stem = re.sub('.txt', '', files[0])
 else:
-	file_stem = options.file_stem
+    file_stem = options.file_stem
 
 # Write output data to separate files for each chromosome.
 print('Writing files:')
 for chr in bin_totals.keys():
-	print (chr)
-	with open(file_stem + '_CompressedBinCounts_' + str(bin_size) + 'bp_' + str(chr) + '.txt','w') as outfile:
-		# Print total bin counts.
-		for bin in range(0, max_bin[chr] + 1):
-			outfile.write('#' + chr + '\t' + str(bin) + '\t')
-			outfile.write(str(bin_totals[chr][bin]) + '\n')
+    print (chr)
+    with open(file_stem + '_CompressedBinCounts_' + str(bin_size) + 'bp_' + str(chr) + '.txt','w') as outfile:
+        # Print total bin counts.
+        for bin in range(0, max_bin[chr] + 1):
+            outfile.write('#' + chr + '\t' + str(bin) + '\t')
+            outfile.write(str(bin_totals[chr][bin]) + '\n')
 
-		# Print bin-bin counts.
-		for bin1 in range(0, max_bin[chr] + 1):
-			for bin2 in range(0, (2 * width) + 1):
-				bin2_orig = bin1 + (bin2 - width)
-				if ((bin2_orig >= 0) and (bin2_orig <= max_bin[chr])):
-					if (bin_bin_counts[chr][bin1, bin2] > 0):
-						outfile.write(chr + '\t' + str(bin1) + '\t' + str(bin2_orig) + '\t' + str(bin_bin_counts[chr][bin1, bin2]) + '\n')
-	del(bin_bin_counts[chr])
+        # Print bin-bin counts.
+        for bin1 in range(0, max_bin[chr] + 1):
+            for bin2 in range(0, (2 * width) + 1):
+                bin2_orig = bin1 + (bin2 - width)
+                if ((bin2_orig >= 0) and (bin2_orig <= max_bin[chr])):
+                    if (bin_bin_counts[chr][bin1, bin2] > 0):
+                        outfile.write(chr + '\t' + str(bin1) + '\t' + str(bin2_orig) + '\t' + str(bin_bin_counts[chr][bin1, bin2]) + '\n')
+    del(bin_bin_counts[chr])
 print("Done.")
