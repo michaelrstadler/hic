@@ -50,7 +50,7 @@ def Add_read (chr, bin1, bin2, num_bins):
 		bin_bin_counts[chr] = np.zeros((num_bins, (2 * width) + 1))
 	# Assign bin2 as a relative position to bin1.
 	bin2_rel = (bin2 - bin1) + width
-	bin_bin_counts[chr][bin1][bin2_rel] = bin_bin_counts[chr][bin1][bin2_rel] + 1
+	bin_bin_counts[chr][bin1, bin2_rel] = bin_bin_counts[chr][bin1, bin2_rel] + 1
 	
 
 def add_to_totals(chr, bin, num_bins):
@@ -133,7 +133,7 @@ for chr in bin_totals.keys():
 			for bin2 in range(0, (2 * width) + 1):
 				bin2_orig = bin1 + (bin2 - width)
 				if ((bin2_orig >= 0) and (bin2_orig <= max_bin[chr])):
-					if (bin_bin_counts[chr][bin1][bin2] > 0):
-						outfile.write(chr + '\t' + str(bin1) + '\t' + str(bin2_orig) + '\t' + str(bin_bin_counts[chr][bin1][bin2]) + '\n')
+					if (bin_bin_counts[chr][bin1, bin2] > 0):
+						outfile.write(chr + '\t' + str(bin1) + '\t' + str(bin2_orig) + '\t' + str(bin_bin_counts[chr][bin1, bin2]) + '\n')
 	del(bin_bin_counts[chr])
 print("Done.")

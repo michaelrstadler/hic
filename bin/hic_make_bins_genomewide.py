@@ -116,8 +116,7 @@ for chr3 in chromosomes:
 outfile.write('\n')
 """
 
-#chromosomes = filter_chr_size(list(bin_counts.keys()), max_bins, min_chr_bins)
-
+# Save data for all chromosomes.
 for chr1 in chromosomes:
 
 	data_this_chr = bin_counts[chr1][chromosomes[0]][0:(max_bins[chr1]+1), 0:(max_bins[chromosomes[0]]+1)]

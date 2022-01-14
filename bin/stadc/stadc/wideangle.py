@@ -87,13 +87,18 @@ def matrix_trim(mat, pctlow=1, pcthigh=99):
     mat_trimmed[mat < lower_cutoff] = lower_cutoff
     return mat_trimmed
 #-----------------------------------------------------------------------
-def plot_compartments(cov, pca_X, vmax=None, filename=None):
+def plot_compartments(cov, pca_X, vmax=None, filename=None, invert=False):
     if vmax == None:
-        vmax = np.max(cov)
+        vmax = np.percentile(cov, 99)
+    comp = np.linalg.eig(cov)[1][:,0]
+    #comp = cov[:,0]
+    if invert:
+        comp = -1 * comp
     fig = plt.figure(constrained_layout=True, figsize=(10,10))
     subfigs = fig.subfigures(2, 1, wspace=0.07, height_ratios=[1, 6.])
     axs0 = subfigs[0].subplots()
-    axs0.plot(pca_X[:,0], linewidth=2)
+    axs0.plot(comp, linewidth=2)
+    #axs0.set_ylim(-1,1)
     axs0.margins(x=0)
     axs0.set_yticklabels([])
     axs0.set_xticklabels([])
@@ -103,9 +108,6 @@ def plot_compartments(cov, pca_X, vmax=None, filename=None):
     axs1.set_yticklabels([])
     axs1.margins(x=0)
 
-    eig = np.linalg.eig(cov)
-    axs0.plot(eig[1][:,0] * 800)
-
-    plt.tight_layout
+    #plt.tight_layout()
     if filename is not None:
         plt.savefig(filename, dpi=300)
