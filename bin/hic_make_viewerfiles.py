@@ -52,7 +52,7 @@ def rebin_1d(arr, new_shape):
 options = parse_options()
 input_binsize = 500
 arb_constant = 10000000 #gets multiplied by the normalized coverage to avoid small number issues
-bin_combinations = [1,2,4,8, 16, 32]
+bin_combinations = [1,2,4,8, 16, 32, 64]
 stepsize = int(options.stepsize)
 windowsize = int(options.windowsize)
 outfolder = options.outfolder
