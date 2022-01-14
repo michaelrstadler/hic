@@ -21,6 +21,7 @@ import sys
 import re
 import gzip
 import numpy as np
+from scipy.sparse import dok_matrix
 
 def parse_options():
 	parser = OptionParser()
@@ -47,7 +48,7 @@ def parse_options():
 def Add_read (chr, bin1, bin2, num_bins):
 	"""Add a new read to bin_bin_counts."""
 	if (chr not in bin_bin_counts):
-		bin_bin_counts[chr] = np.zeros((num_bins, (2 * width) + 1))
+		bin_bin_counts[chr] = dok_matrix((num_bins, (2 * width) + 1))
 	# Assign bin2 as a relative position to bin1.
 	bin2_rel = (bin2 - bin1) + width
 	bin_bin_counts[chr][bin1, bin2_rel] = bin_bin_counts[chr][bin1, bin2_rel] + 1
