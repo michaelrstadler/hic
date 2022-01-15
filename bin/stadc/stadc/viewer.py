@@ -9,6 +9,7 @@ from ipywidgets import GridspecLayout, HBox
 from IPython.display import display, clear_output
 import re
 import gzip
+from datetime import date
 from skimage import exposure
 
 def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks=True):

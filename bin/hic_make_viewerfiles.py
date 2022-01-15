@@ -17,6 +17,7 @@ import sys
 import re
 import gzip
 import os
+from time import time
 import scipy
 import numpy as np
 
@@ -78,15 +79,17 @@ def pad(panel, windowsize):
 ####
 
 if __name__ == "__main__":
-
+    t1 = time()
     options = parse_options()
     input_binsize = 500
     arb_constant = 10000000 #gets multiplied by the normalized coverage to avoid small number issues
     bin_combinations = [1,2,4,8, 16, 32, 64, 128]
     stepsize = int(options.stepsize)
     windowsize = int(options.windowsize)
-    outfolder = options.outfolder
     infolder = options.infolder
+    outfolder = options.outfolder
+    if not os.path.isdir(outfolder):
+        os.mkdir(out_folder)
 
     # Read total counts file.
     bin_totals_file = os.path.join(infolder, 'bin_totals.txt')
@@ -141,3 +144,6 @@ if __name__ == "__main__":
                         pos2 = pos1 + windowsize_new * input_binsize
                         outfilename = os.path.join(outfolder , chr_ + '_' + str(pos1) + '_' + str(pos2) + '_' + str(binsize_new) + '.txt.gz')
                         np.savetxt(outfilename, panel_binned_norm, newline='\n', fmt='%.6e')
+
+t2 = time()
+print('Time: ' + str(t2 - t1))
