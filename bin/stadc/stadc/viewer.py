@@ -12,7 +12,7 @@ import gzip
 from datetime import date
 from skimage import exposure
 
-def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks=True):
+def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks=True, figsize=15):
     """Jupyter notebook viewer for Hi-C data
     
     Args:
@@ -197,6 +197,14 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
                 ax[1].cla()
                 ax[1].axvline(0, color="gray", alpha=0.5)
                 if (state.chr in state.track_data):
+                    # If right side extends past end of track, pad with zeros.
+                    if track_binR > len(state.track_data[state.chr]):
+                        state.track_data[state.chr] = np.concatenate(
+                            (
+                                state.track_data[state.chr],
+                                np.zeros(track_binR - len(state.track_data[state.chr]) + 10)
+                            )
+                        )
                     ax[1].plot(state.track_data[state.chr][np.arange(track_binR, track_binL, -1)], np.arange(track_binL, track_binR))
                 else:
                     ax[1].plot(np.zeros(track_binR - track_binL), np.arange(track_binL, track_binR))
@@ -478,12 +486,12 @@ def viewer(data_folder, track_folder, save_folder, oldformat=False, genometracks
     display(grid)    
     
     # Draw the initial figure.
-    chosen_value=5
+    chosen_value=figsize
     if (genometracks):
-        fig, ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [15, 1]}, figsize=(chosen_value, 1.05 * chosen_value / 2))
+        fig, ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [15, 1]}, figsize=(figsize, 1.05 * figsize / 2))
         fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=-0.4, hspace=None)
     else:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots( figsize=(figsize, 1.05 * figsize / 2))
         ax = [ax]
     img = ax[0].imshow(np.zeros((400,400)), vmin=0, vmax=1000, cmap=state.cmap, interpolation="none")
 

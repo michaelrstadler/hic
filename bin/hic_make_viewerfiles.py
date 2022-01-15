@@ -89,7 +89,7 @@ if __name__ == "__main__":
     infolder = options.infolder
     outfolder = options.outfolder
     if not os.path.isdir(outfolder):
-        os.mkdir(out_folder)
+        os.mkdir(outfolder)
 
     # Read total counts file.
     bin_totals_file = os.path.join(infolder, 'bin_totals.txt')
