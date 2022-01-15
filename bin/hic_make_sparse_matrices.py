@@ -18,9 +18,11 @@ __version__ = '1.0.0'
 
 from optparse import OptionParser
 import sys
+import os
 import re
 import gzip
 import numpy as np
+import pickle
 from scipy.sparse import dok_matrix
 
 def parse_options():
@@ -37,13 +39,13 @@ def parse_options():
                       help="width in bins from diagonal")
 
     
-    parser.add_option("-s", "--file_stem",
-                        dest="file_stem", default='none',
-                      help="output file stem. Adds diag_bin_counts bin size and chr_")
+    parser.add_option("-o", "--out_folder",
+                        dest="out_folder",
+                      help="Folder for output")
 
     parser.add_option("-v", "--valid_chrs",
                         dest="valid_chrs", default=None,
-                      help="Valid chr_omosome names, delimited by |")
+                      help="[optiona]Valid chr_omosome names, delimited by |")
 
     (options, args) = parser.parse_args()
     return options
@@ -75,6 +77,11 @@ def update_max_bin(chr_, bin1, bin2):
 # Main:
     
 options = parse_options()
+
+out_folder = options.out_folder
+if not os.path.isdir(out_folder):
+    os.mkdir(out_folder)
+
 valid_chrs = options.valid_chrs
 if valid_chrs is None:
     valid_chrs = []
@@ -103,8 +110,10 @@ for f in files:
 
     for line in infile:
         line_count = line_count + 1
-        if (line_count % 10000000 == 0):
-            print('. ' + str(line_count / 10000000))
+        if (line_count % 1000000 == 0):
+            #print('. ' , end = '')
+            sys.stdout.write('.')
+            sys.stdout.flush()
         line = line.rstrip()
         items = line.split()
         (chr1, Lmost1, chr2, Lmost2) = items[2], int(items[3]), items[5], int(items[6])
@@ -124,12 +133,29 @@ for f in files:
 print('done reading\n')
 
 # Set up output file stem
+"""
 file_stem = ''
 if (options.file_stem == 'none'):
     file_stem = re.sub('.txt', '', files[0])
 else:
     file_stem = options.file_stem
+"""
 
+
+bin_totals_file = os.path.join(out_folder, 'bin_totals.txt')
+with open(bin_totals_file, 'w') as outfile:
+    for chr_ in bin_totals:
+        for bin in range(0, max_bin[chr_] + 1):
+            if bin_totals[chr_][bin] > 0:
+                outfile.write(chr_ + '\t' + str(bin) + '\t')
+                outfile.write(str(bin_totals[chr_][bin]) + '\n')
+
+for chr_ in bin_bin_counts:
+    chr_file = os.path.join(out_folder, chr_ + '_sparsemat.pkl')
+    with open(chr_file, 'wb') as file:
+        pickle.dump(bin_bin_counts[chr_], file, protocol=4)
+
+"""
 # Write output data to separate files for each chr_omosome.
 print('Writing files:')
 for chr_ in bin_totals.keys():
@@ -150,3 +176,4 @@ for chr_ in bin_totals.keys():
                         outfile.write(chr_ + '\t' + str(bin1) + '\t' + str(bin2_orig) + '\t' + str(bin_bin_counts[chr_][bin1, bin2]) + '\n')
     del(bin_bin_counts[chr_])
 print("Done.")
+"""

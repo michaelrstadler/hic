@@ -15,6 +15,7 @@ import sys
 import re
 import gzip
 import os
+import scipy
 import numpy as np
 
 def parse_options():
