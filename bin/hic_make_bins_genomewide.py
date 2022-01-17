@@ -105,7 +105,7 @@ else:
 	file_stem = options.file_stem
 
 #outfile = open(file_stem + '_binCounts_' + str(bin_size // 1000) + 'kB.txt','w')
-outfilename = file_stem + '_binCounts_' + str(bin_size // 1000) + 'kB.txt'
+outfilename = file_stem + '_binCounts_' + str(bin_size // 1000) + 'kB.txt.gz'
 
 
 #print column labels
@@ -116,11 +116,17 @@ for chr3 in chromosomes:
 outfile.write('\n')
 """
 
+# Save data for individual chromosomes.
+for chr_ in chromosomes:
+	chr_outfilename = outfilename = file_stem + '_binCounts_' + str(bin_size // 1000) + 'kB_chr' + chr_ + '.txt.gz'
+	max_bin = max_bins[chr_]
+	data_chr = bin_counts[chr_][chr_][:max_bin, :max_bin]
+	np.savetxt(chr_outfilename, data_chr, newline='\n', fmt='%.6e')
+
 # Save data for all chromosomes.
 for chr1 in chromosomes:
 
 	data_this_chr = bin_counts[chr1][chromosomes[0]][0:(max_bins[chr1]+1), 0:(max_bins[chromosomes[0]]+1)]
-	
 	for chr2 in chromosomes[1:]:
 		if (chr2 in bin_counts[chr1]):
 			data_this_chr = np.hstack((data_this_chr, bin_counts[chr1][chr2][0:(max_bins[chr1]+1),0:(max_bins[chr2]+1)]))
