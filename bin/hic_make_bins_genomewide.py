@@ -118,7 +118,7 @@ outfile.write('\n')
 
 # Save data for individual chromosomes.
 for chr_ in chromosomes:
-	chr_outfilename = outfilename = file_stem + '_binCounts_' + str(bin_size // 1000) + 'kB_chr' + chr_ + '.txt.gz'
+	chr_outfilename = file_stem + '_binCounts_' + str(bin_size // 1000) + 'kB_chr' + chr_ + '.txt.gz'
 	max_bin = max_bins[chr_]
 	data_chr = bin_counts[chr_][chr_][:max_bin, :max_bin]
 	np.savetxt(chr_outfilename, data_chr, newline='\n', fmt='%.6e')
