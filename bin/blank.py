@@ -1,18 +1,25 @@
-'''
-Describe program here.
-'''
-from optparse import OptionParser
-import sys
-import re
+#!/usr/bin/env python
 
-def parse_options():
-	parser = OptionParser()
-	parser.add_option("-f", "--file", dest="filename",
-					  help="Reduced bin file", metavar="FILE")
-	parser.add_option("-l", "--locations", dest="loc_file",
-					  help="File of locations to map", metavar="FILE2")
+"""name.py: Declarative description of what program does
 
-	(options, args) = parser.parse_args()
-	return options
-            
-options = parse_options()
+More detailed description.
+
+TO DO:
+-
+"""
+
+__author__      = "Michael Stadler"
+__copyright__   = "Copyright 2022, California, USA"
+__version__ = "1.0.0"
+
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='.')
+    parser.add_argument("-f", "--training_data_folder", type=str,  required=True,
+                help="Folder containing training data in folders labeled left and right.")
+    
+    args = parser.parse_args()
+    return args
+
+args = parse_args()
