@@ -4,7 +4,6 @@
 repeats on one read, write two fastq files containing corresponding
 reads.
 
-
 TO DO:
 -
 """
@@ -50,12 +49,14 @@ if not os.path.isdir(args.outdir):
 
 # Setup outfiles.
 stem1 = re.sub('.gz', '', args.file1)
+stem1 = os.path.join(args.outdir, os.path.basename(stem1))
 outfile1 = re.sub('.fastq','', stem1) + '_withGArep.fastq.gz'
 print('')
 print(outfile1)
 print('')
     
 stem2 = re.sub('.gz', '', args.file2)
+stem2 = os.path.join(args.outdir, os.path.basename(stem2))
 outfile2 = re.sub('.fastq','', stem2) + '_comp_GArep.fastq.gz'
 print(outfile2)
 
@@ -89,6 +90,3 @@ with gzip.open(args.file2, 'rt') as handle:
 
 with gzip.open(outfile2, 'wt') as outfile:
     SeqIO.write(matched_seqs, outfile, 'fastq')
-"""
-"""  
-    
