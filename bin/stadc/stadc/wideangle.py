@@ -10,7 +10,7 @@ from sklearn.decomposition import PCA
 from flymovie import mesh_like
 import matplotlib.pyplot as plt
 
-#-----------------------------------------------------------------------
+#---------------------------------------------------------------------------
 def norm_hic_matrix(mat):
     """Apply vanilla normalization to a matrix.
     
